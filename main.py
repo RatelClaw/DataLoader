@@ -9,13 +9,13 @@ from embdloader.application.use_cases.data_loader_use_case import DataLoaderUseC
 
 async def main():
     # Initialize Postgres (optional, if using Postgres instead of Chroma)
-    db_conn = DBConnection()
-    await db_conn.initialize()
+    # db_conn = DBConnection()
+    # await db_conn.initialize()
     # repo = PostgresDataRepository(db_connection=db_conn)
 
     # Initialize Chroma vector store (persistent or in-memory)
-    # repo = ChromaVectorStore(mode='persistent', path='./my_chroma_db')  # Or mode='in-memory'
-    repo = FaissVectorStore()
+    repo = ChromaVectorStore(mode='persistent', path='./my_chroma_db')  # Or mode='in-memory'
+    # repo = FaissVectorStore()
 
     # Initialize embedding provider and loader
     embedding = GeminiEmbeddingProvider()
