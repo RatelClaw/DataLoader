@@ -8,6 +8,8 @@ It supports multiple embedding providers (**Bedrock, Gemini, Sentence-Transforme
 
 ---
 
+
+
 ## 🚀 Features
 
 - **Data Loading**: From S3 or local CSV files.
@@ -19,7 +21,22 @@ It supports multiple embedding providers (**Bedrock, Gemini, Sentence-Transforme
 - **Extensibility**: Plugin-style for providers and stores.
 - **Validation**: Schema, type, null checks.
 
----
+---## Setup Instructions
+
+To use this repo:
+
+```bash
+git clone <repo-url>
+cd DataLoader
+uv venv
+.venv\Scripts\activate   # On Windows
+# source .venv/bin/activate   # On Linux/Mac
+uv pip install -r requirements.txt
+uv pip install -e .[chroma,gemini,dev]
+
+uv run main_local.py
+# or
+uv run main.py
 
 ## 📦 Installation
 
