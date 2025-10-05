@@ -1,0 +1,13 @@
+boto3
+asyncpg
+pgvector
+pandas
+pydantic
+tenacity
+google-generativeai
+sentence-transformers
+faiss-cpu
+chromadb
+openai
+scikit-learn
+numpy
