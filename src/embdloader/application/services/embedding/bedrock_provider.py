@@ -3,7 +3,15 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import List
 from src.embdloader.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.embdloader.config import AWS_REGION, EMBEDDING_MODEL, CONTENT_TYPE, DEFAULT_VECTOR_VALUE, DEFAULT_DIMENTION, logger
+from src.embdloader.config import (
+    AWS_REGION,
+    EMBEDDING_MODEL,
+    CONTENT_TYPE,
+    DEFAULT_VECTOR_VALUE,
+    DEFAULT_DIMENTION,
+    logger,
+)
+
 
 class BedrockEmbeddingProvider(EmbeddingProviderInterface):
     """Bedrock embedding provider."""
@@ -36,7 +44,10 @@ class BedrockEmbeddingProvider(EmbeddingProviderInterface):
             payload = {"inputText": desc}
             body = json.dumps(payload)
             response = self.client.invoke_model(
-                body=body, modelId=EMBEDDING_MODEL, accept=CONTENT_TYPE, contentType=CONTENT_TYPE
+                body=body,
+                modelId=EMBEDDING_MODEL,
+                accept=CONTENT_TYPE,
+                contentType=CONTENT_TYPE,
             )
             response_body = json.loads(response.get("body").read())
             return response_body.get(
@@ -46,7 +57,9 @@ class BedrockEmbeddingProvider(EmbeddingProviderInterface):
             logger.error(f"Error creating embedding: {str(e)}")
             return [DEFAULT_VECTOR_VALUE] * DEFAULT_DIMENTION
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode Bedrock response JSON: {str(e)}", exc_info=True)
+            logger.error(
+                f"Failed to decode Bedrock response JSON: {str(e)}", exc_info=True
+            )
             return [DEFAULT_VECTOR_VALUE] * DEFAULT_DIMENTION
         except Exception as e:
             logger.error(

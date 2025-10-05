@@ -33,7 +33,7 @@ class GeminiEmbeddingProvider(EmbeddingProviderInterface):
             resp = self.client.models.embed_content(
                 model="gemini-embedding-001",
                 contents=texts,
-                config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY")
+                config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
             )
 
             embeddings = [np.array(e.values).tolist() for e in resp.embeddings]

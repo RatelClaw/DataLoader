@@ -62,3 +62,8 @@ embdloader-run = "main:main"
 [build-system]
 requires = ["setuptools>=64.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "black>=25.9.0",
+]

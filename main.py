@@ -1,11 +1,14 @@
 import asyncio
 from embdloader.infrastructure.db.db_connection import DBConnection
-from embdloader.infrastructure.db.data_repository import PostgresDataRepository 
+from embdloader.infrastructure.db.data_repository import PostgresDataRepository
 from embdloader.infrastructure.vector_stores.chroma_store import ChromaVectorStore
 from embdloader.infrastructure.vector_stores.faiss_store import FaissVectorStore
 from embdloader.infrastructure.storage.loaders import LocalLoader
-from embdloader.application.services.embedding.gemini_provider import GeminiEmbeddingProvider
+from embdloader.application.services.embedding.gemini_provider import (
+    GeminiEmbeddingProvider,
+)
 from embdloader.application.use_cases.data_loader_use_case import DataLoaderUseCase
+
 
 async def main():
     # Initialize Postgres (optional, if using Postgres instead of Chroma)
@@ -14,7 +17,9 @@ async def main():
     # repo = PostgresDataRepository(db_connection=db_conn)
 
     # Initialize Chroma vector store (persistent or in-memory)
-    repo = ChromaVectorStore(mode='persistent', path='./my_chroma_db')  # Or mode='in-memory'
+    repo = ChromaVectorStore(
+        mode="persistent", path="./my_chroma_db"
+    )  # Or mode='in-memory'
     # repo = FaissVectorStore()
 
     # Initialize embedding provider and loader
@@ -24,18 +29,18 @@ async def main():
 
     # Load data from CSV
     await use_case.execute(
-        'data_to_load/sample.csv',
-        'test_table_2',
-        ['name', 'description'],
-        ['id'],
+        "data_to_load/sample.csv",
+        "test_table_2",
+        ["name", "description"],
+        ["id"],
         create_table_if_not_exists=True,
-        embed_type='combined' # 'separated'  # Or 'combined'
+        embed_type="combined",  # 'separated'  # Or 'combined'
     )
 
     # Retrieval example
     # query_text = "example project description"
     # query_embedding = embedding.get_embeddings([query_text])[0]
-    
+
     # For combined mode (uses 'embeddings' column)
     # results = await repo.search('test_table_2', query_embedding, top_k=5)
     # print("Combined mode retrieval results:")
@@ -48,5 +53,6 @@ async def main():
     # for result in results:
     #     print(f"ID: {result['id']}, Document: {result['document']}, Distance: {result['distance']}, Metadata: {result['metadata']}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())

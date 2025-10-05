@@ -29,8 +29,7 @@ class OpenAIEmbeddingProvider(EmbeddingProviderInterface):
         """
         try:
             response = self.client.embeddings.create(
-                model="text-embedding-3-small",
-                input=texts
+                model="text-embedding-3-small", input=texts
             )
             results = [item.embedding for item in response.data]
 

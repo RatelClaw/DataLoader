@@ -4,10 +4,11 @@ from src.embdloader.interfaces.embedding_provider import EmbeddingProviderInterf
 from src.embdloader.config import logger
 from src.embdloader.domain.entities import EmbeddingError
 
+
 class SentenceTransformersProvider(EmbeddingProviderInterface):
     """Local embedding provider using sentence-transformers."""
 
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2'):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
 
     def get_embeddings(self, texts: List[str]) -> List[List[float]]:
