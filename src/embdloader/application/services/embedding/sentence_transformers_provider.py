@@ -2,6 +2,7 @@ from typing import List
 from sentence_transformers import SentenceTransformer
 from src.embdloader.interfaces.embedding_provider import EmbeddingProviderInterface
 from src.embdloader.config import logger
+from src.embdloader.domain.entities import EmbeddingError
 
 class SentenceTransformersProvider(EmbeddingProviderInterface):
     """Local embedding provider using sentence-transformers."""
@@ -14,4 +15,4 @@ class SentenceTransformersProvider(EmbeddingProviderInterface):
             return self.model.encode(texts, show_progress_bar=False).tolist()
         except Exception as e:
             logger.error(f"Embedding error: {e}")
-            raise
+            raise EmbeddingError(f"Embedding failed: {e}")
