@@ -3,13 +3,13 @@ from typing import List, Dict, Any
 import chromadb
 import json
 from chromadb.config import Settings
-from src.embdloader.interfaces.vector_store import VectorStoreInterface
-from src.embdloader.domain.entities import (
+from src.dataload.interfaces.vector_store import VectorStoreInterface
+from src.dataload.domain.entities import (
     DataValidationError,
     DBOperationError,
     TableSchema,
 )
-from src.embdloader.config import DEFAULT_DIMENTION, logger
+from src.dataload.config import DEFAULT_DIMENTION, logger
 
 
 class ChromaVectorStore(VectorStoreInterface):
@@ -29,6 +29,28 @@ class ChromaVectorStore(VectorStoreInterface):
         self.collections: Dict[str, Any] = {}  # table_name -> collection
         self.schemas: Dict[str, TableSchema] = {}
         self.data: Dict[str, pd.DataFrame] = {}  # For simulating relational data
+        if self.mode == "persistent":
+            self._load_existing_collections()
+    
+    
+
+    def _load_existing_collections(self):
+        """Load all existing collection objects from the persistent client."""
+        try:
+            list_collections = self.client.list_collections()
+            for collection_info in list_collections:
+                name = collection_info.name
+                # Get the actual collection object from the client
+                collection = self.client.get_collection(name=name)
+                self.collections[name] = collection
+                logger.info(f"Loaded existing Chroma collection: {name}")
+
+            # Note: Schemas and in-memory data (`self.data`) are not persisted
+            # in this implementation, which might lead to other issues if you rely 
+            # on them being present on a fresh run without calling `execute` again.
+
+        except Exception as e:
+            logger.warning(f"Failed to load existing collections: {e}")
 
     def _create_client(self):
         """Create Chroma client based on mode."""

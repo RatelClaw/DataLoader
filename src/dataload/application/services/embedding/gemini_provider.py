@@ -5,9 +5,9 @@ import numpy as np
 from google import genai
 from google.genai import types
 
-from src.embdloader.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.embdloader.config import logger
-from src.embdloader.domain.entities import EmbeddingError
+from src.dataload.interfaces.embedding_provider import EmbeddingProviderInterface
+from src.dataload.config import logger
+from src.dataload.domain.entities import EmbeddingError
 
 
 class GeminiEmbeddingProvider(EmbeddingProviderInterface):

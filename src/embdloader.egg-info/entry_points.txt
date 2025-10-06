@@ -1,2 +1,0 @@
-[console_scripts]
-embdloader-run = main:main

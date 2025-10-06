@@ -1,13 +1,13 @@
 import asyncio
-from embdloader.infrastructure.db.db_connection import DBConnection
-from embdloader.infrastructure.db.data_repository import PostgresDataRepository
-from embdloader.infrastructure.vector_stores.chroma_store import ChromaVectorStore
-from embdloader.infrastructure.vector_stores.faiss_store import FaissVectorStore
-from embdloader.infrastructure.storage.loaders import LocalLoader
-from embdloader.application.services.embedding.gemini_provider import (
+from dataload.infrastructure.db.db_connection import DBConnection
+from dataload.infrastructure.db.data_repository import PostgresDataRepository
+from dataload.infrastructure.vector_stores.chroma_store import ChromaVectorStore
+from dataload.infrastructure.vector_stores.faiss_store import FaissVectorStore
+from dataload.infrastructure.storage.loaders import LocalLoader
+from dataload.application.services.embedding.gemini_provider import (
     GeminiEmbeddingProvider,
 )
-from embdloader.application.use_cases.data_loader_use_case import DataLoaderUseCase
+from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
 
 
 async def main():
@@ -25,7 +25,7 @@ async def main():
     # Initialize embedding provider and loader
     embedding = GeminiEmbeddingProvider()
     loader = LocalLoader()
-    use_case = DataLoaderUseCase(repo, embedding, loader)
+    use_case = dataloadUseCase(repo, embedding, loader)
 
     # Load data from CSV
     await use_case.execute(

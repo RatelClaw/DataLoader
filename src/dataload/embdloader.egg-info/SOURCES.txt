@@ -13,11 +13,11 @@ src/application/use_cases/data_loader_use_case.py
 src/application/use_cases/data_updater_use_case.py
 src/domain/__init__.py
 src/domain/entities.py
-src/embdloader.egg-info/PKG-INFO
-src/embdloader.egg-info/SOURCES.txt
-src/embdloader.egg-info/dependency_links.txt
-src/embdloader.egg-info/requires.txt
-src/embdloader.egg-info/top_level.txt
+src/dataload.egg-info/PKG-INFO
+src/dataload.egg-info/SOURCES.txt
+src/dataload.egg-info/dependency_links.txt
+src/dataload.egg-info/requires.txt
+src/dataload.egg-info/top_level.txt
 src/infrastructure/__init__.py
 src/infrastructure/db/__init__.py
 src/infrastructure/db/data_repository.py

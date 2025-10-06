@@ -1,3 +1,52 @@
+Metadata-Version: 2.4
+Name: dataload
+Version: 1.0.0
+Summary: Production-grade embedding loader for CSV data to vector stores with multiple providers.
+Author-email: Your Name <your.email@example.com>
+License: MIT
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: boto3==1.34.0
+Requires-Dist: asyncpg==0.29.0
+Requires-Dist: pgvector==0.2.5
+Requires-Dist: pandas==2.2.2
+Requires-Dist: pydantic==2.8.2
+Requires-Dist: tenacity==8.5.0
+Requires-Dist: numpy==1.26.4
+Requires-Dist: anyio==4.8.0
+Provides-Extra: gemini
+Requires-Dist: google_genai==1.39.0; extra == "gemini"
+Provides-Extra: sentence-transformers
+Requires-Dist: sentence-transformers==3.0.1; extra == "sentence-transformers"
+Requires-Dist: torch==2.4.0; extra == "sentence-transformers"
+Provides-Extra: openai
+Requires-Dist: openai==1.51.0; extra == "openai"
+Provides-Extra: faiss
+Requires-Dist: faiss-cpu==1.8.0; extra == "faiss"
+Provides-Extra: chroma
+Requires-Dist: chromadb==0.5.3; extra == "chroma"
+Requires-Dist: posthog==3.6.6; extra == "chroma"
+Provides-Extra: dev
+Requires-Dist: pytest==8.3.2; extra == "dev"
+Requires-Dist: pytest-asyncio==0.23.8; extra == "dev"
+Provides-Extra: all
+Requires-Dist: google_genai==1.39.0; extra == "all"
+Requires-Dist: sentence-transformers==3.0.1; extra == "all"
+Requires-Dist: torch==2.4.0; extra == "all"
+Requires-Dist: openai==1.51.0; extra == "all"
+Requires-Dist: faiss-cpu==1.8.0; extra == "all"
+Requires-Dist: chromadb==0.5.3; extra == "all"
+Requires-Dist: posthog==3.6.6; extra == "all"
+Requires-Dist: pytest==8.3.2; extra == "all"
+Requires-Dist: pytest-asyncio==0.23.8; extra == "all"
+
 # dataload: Embedding Loader Package
 
 **dataload** is a robust, extensible Python library for loading CSV data from S3 or local files into vector stores (**Postgres**, **FAISS**, **Chroma**) with embedding generation. It supports multiple embedding providers (**AWS Bedrock**, **Google Gemini**, **Sentence-Transformers**, **OpenAI**) and two embedding modes:

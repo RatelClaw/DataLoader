@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from typing import List, Dict, Optional
 from asyncpg.exceptions import PostgresError
-from src.embdloader.domain.entities import (
+from src.dataload.domain.entities import (
     TableSchema,
     DBOperationError,
     DataValidationError,
 )
-from src.embdloader.infrastructure.db.db_connection import DBConnection
-from src.embdloader.config import logger, DEFAULT_DIMENTION
+from src.dataload.infrastructure.db.db_connection import DBConnection
+from src.dataload.config import logger, DEFAULT_DIMENTION
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 
@@ -163,6 +163,7 @@ class PostgresDataRepository(DataRepositoryInterface):
             columns.append(f"{col} {pg_type}{not_null}")
             column_types[col] = pg_type
         # Add embed_columns_names always
+        columns = [c.strip() for c in columns if c and c.strip()]
         columns.append("embed_columns_names text[]")
         column_types["embed_columns_names"] = "text[]"
         if embed_type == "combined":
@@ -356,3 +357,75 @@ class PostgresDataRepository(DataRepositoryInterface):
             for col in schema.columns
             if col not in self.EXTRA_COLUMNS and not col.endswith("_enc")
         ]
+
+    # Insert this method into your PostgresDataRepository class 
+    # in src/dataload/infrastructure/db/data_repository.py
+
+    async def search(
+        self,
+        table_name: str,
+        query_embedding: List[float],
+        top_k: int = 5,
+        embed_column: str = "embeddings",
+    ) -> List[Dict]:
+        """Performs vector similarity search using the pgvector <-> operator."""
+        
+        # 1. Get relevant columns for the final result/metadata
+        try:
+            # data_columns excludes 'embeddings', 'embed_columns_names', etc.
+            data_columns = await self.get_data_columns(table_name)
+        except DBOperationError:
+            # Fallback for search on an empty table (less likely in real scenarios)
+            data_columns = ["id", "name", "description"] 
+        
+        # Ensure 'id' is included for the result ID
+        if 'id' not in data_columns:
+            data_columns.append('id')
+            
+        # 2. Construct the SQL query
+        # The query retrieves all data columns, plus the calculated distance.
+        # The ORDER BY clause is crucial for k-NN search using the '<->' operator.
+        query = f"""
+        SELECT 
+            {', '.join(data_columns)}, 
+            {embed_column} <-> $1 AS distance
+        FROM {table_name}
+        WHERE is_active = TRUE
+        ORDER BY {embed_column} <-> $1
+        LIMIT $2
+        """
+        
+        # 3. Prepare the vector for asyncpg (pgvector expects an array string)
+        # pg_vector = "[" + ",".join(map(str, query_embedding)) + "]"
+
+        try:
+            async with self.db.get_connection() as conn:
+                rows = await conn.fetch(query, query_embedding, top_k) 
+                
+            results = []
+            for row in rows:
+                row_dict = dict(row)
+                
+                # Construct metadata dictionary by excluding control columns
+                metadata = {
+                    k: v 
+                    for k, v in row_dict.items() 
+                    if k in data_columns and k != 'id'
+                }
+                
+                # Determine the original text column that was embedded
+                # For 'description_enc', the document text should come from 'description'
+                document_column = embed_column.replace('_enc', '') if embed_column.endswith('_enc') else 'embed_columns_value'
+                document_text = row_dict.get(document_column, 'N/A')
+
+                results.append({
+                    "id": str(row_dict.get('id', 'N/A')),
+                    "document": document_text,
+                    "distance": row_dict.get('distance', -1.0),
+                    "metadata": metadata,
+                })
+            return results
+
+        except PostgresError as e:
+            logger.error(f"Postgres search error in {table_name}: {e}")
+            raise DBOperationError(f"Postgres search failed: {e}")

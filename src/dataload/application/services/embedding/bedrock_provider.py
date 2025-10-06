@@ -2,8 +2,8 @@ import json
 import boto3
 from botocore.exceptions import ClientError
 from typing import List
-from src.embdloader.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.embdloader.config import (
+from src.dataload.interfaces.embedding_provider import EmbeddingProviderInterface
+from src.dataload.config import (
     AWS_REGION,
     EMBEDDING_MODEL,
     CONTENT_TYPE,

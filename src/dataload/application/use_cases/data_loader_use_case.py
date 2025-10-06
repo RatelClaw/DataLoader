@@ -1,13 +1,13 @@
 import pandas as pd
 from typing import List
-from src.embdloader.domain.entities import DataValidationError, TableSchema
-from src.embdloader.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.embdloader.infrastructure.db.data_repository import DataRepositoryInterface
-from src.embdloader.interfaces.storage_loader import StorageLoaderInterface
-from src.embdloader.config import logger
+from src.dataload.domain.entities import DataValidationError, TableSchema
+from src.dataload.interfaces.embedding_provider import EmbeddingProviderInterface
+from src.dataload.infrastructure.db.data_repository import DataRepositoryInterface
+from src.dataload.interfaces.storage_loader import StorageLoaderInterface
+from src.dataload.config import logger
 
 
-class DataLoaderUseCase:
+class dataloadUseCase:
     """Use case for loading new data."""
 
     def __init__(

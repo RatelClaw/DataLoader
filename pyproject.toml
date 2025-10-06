@@ -1,5 +1,5 @@
 [project]
-name = "embdloader"
+name = "dataload"
 version = "1.0.0"
 description = "Production-grade embedding loader for CSV data to vector stores with multiple providers."
 authors = [
@@ -57,7 +57,7 @@ all = [
 ]
 
 [project.scripts]
-embdloader-run = "main:main"
+dataload-run = "main:main"
 
 [build-system]
 requires = ["setuptools>=64.0.0", "wheel"]

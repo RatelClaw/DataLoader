@@ -5,7 +5,7 @@ import asyncpg
 from asyncpg import create_pool
 from asyncpg.exceptions import PostgresError
 from tenacity import retry, stop_after_attempt, wait_exponential
-from src.embdloader.config import (
+from src.dataload.config import (
     AWS_REGION,
     SECRET_NAME,
     logger,
@@ -17,7 +17,7 @@ from src.embdloader.config import (
 )
 from contextlib import asynccontextmanager
 from pgvector.asyncpg import register_vector
-from src.embdloader.domain.entities import DBOperationError
+from src.dataload.domain.entities import DBOperationError
 
 
 class DBConnection:
