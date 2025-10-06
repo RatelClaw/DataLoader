@@ -3,11 +3,14 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+*.egg
 
-# Virtual environment
+# Virtual environments
 load-env/
 env/
 venv/
+.venv/
 
 # IDE / Editor
 .idea/
