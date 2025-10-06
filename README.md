@@ -1,6 +1,6 @@
-# dataload: Embedding Loader Package
+# vector-dataloader: Embedding Loader Package
 
-**dataload** is a robust, extensible Python library for loading CSV data from S3 or local files into vector stores (**Postgres**, **FAISS**, **Chroma**) with embedding generation. It supports multiple embedding providers (**AWS Bedrock**, **Google Gemini**, **Sentence-Transformers**, **OpenAI**) and two embedding modes:
+**vector-dataloader** is a robust, extensible Python library for loading CSV data from S3 or local files into vector stores (**Postgres**, **FAISS**, **Chroma**) with embedding generation. It supports multiple embedding providers (**AWS Bedrock**, **Google Gemini**, **Sentence-Transformers**, **OpenAI**) and two embedding modes:
 
 - **Combined**: Concatenated text with a single embedding.
 - **Separated**: Individual embeddings per column.
@@ -38,18 +38,18 @@ uv run main.py
 Install via pip or uv:
 
 ````bash
-pip install dataload
+pip install vector-dataloader
 # or
-uv add dataload
+uv add vector-dataloader
 
 Install optional dependencies for specific providers/stores:
-pip install dataload[chroma,gemini]
+pip install vector-dataloader[chroma,gemini]
 # or
-uv add dataload[chroma,gemini]
+uv add vector-dataloader[chroma,gemini]
 
 Available extras: gemini, sentence-transformers, openai, faiss, chroma, all.
 ⚙️ Usage
-Below are example scripts for different combinations of vector stores and embedding providers. Save these as separate files (e.g., main_chroma_genai.py) and run with uv run <filename>.py or python <filename>.py.
+Below are example scripts for different combinations of vector stores and embedding providers. Save these as separate files (e.g., main_chroma_gemni.py) and run with uv run <filename>.py or python <filename>.py.
 Chroma with Gemini
 import asyncio
 from dataload.infrastructure.vector_stores.chroma_store import ChromaVectorStore

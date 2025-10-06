@@ -1,9 +1,9 @@
 [project]
-name = "dataload"
+name = "vector-dataloader"
 version = "1.0.0"
 description = "Production-grade embedding loader for CSV data to vector stores with multiple providers."
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "Shashwat Roy", email = "shashwatunf@gmail.com" }
 ]
 license = { text = "MIT" }
 readme = "README.md"
@@ -26,6 +26,7 @@ dependencies = [
     "tenacity==8.5.0",
     "numpy==1.26.4",
     "anyio==4.8.0",
+    "python-dotenv==1.0.1",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +44,7 @@ chroma = [
 dev = [
     "pytest==8.3.2",
     "pytest-asyncio==0.23.8",
+    "black>=25.9.0",
 ]
 all = [
     "google_genai==1.39.0",
@@ -54,13 +56,14 @@ all = [
     "posthog==3.6.6",
     "pytest==8.3.2",
     "pytest-asyncio==0.23.8",
+    "black>=25.9.0",
 ]
 
 [project.scripts]
 dataload-run = "main:main"
 
 [build-system]
-requires = ["setuptools>=64.0.0", "wheel"]
+requires = ["setuptools>=64.0.0", "wheel", "build"]
 build-backend = "setuptools.build_meta"
 
 [dependency-groups]
