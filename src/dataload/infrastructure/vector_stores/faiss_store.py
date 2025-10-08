@@ -6,13 +6,13 @@ import json
 from typing import List, Dict, Any, Union
 
 # Assuming these are correct imports for your project structure
-from src.dataload.interfaces.vector_store import VectorStoreInterface
-from src.dataload.domain.entities import (
+from dataload.interfaces.vector_store import VectorStoreInterface
+from dataload.domain.entities import (
     DataValidationError,
     DBOperationError,
     TableSchema,
 )
-from src.dataload.config import DEFAULT_DIMENTION, logger 
+from dataload.config import DEFAULT_DIMENSION, logger 
 
 # --- Persistence Configuration ---
 FAISS_STORAGE_PATH = "./faiss_storage" 
@@ -130,7 +130,7 @@ class FaissVectorStore(VectorStoreInterface):
             if filename.endswith("_faiss.bin"):
                 index_key = filename.replace("_faiss.bin", "")
                 
-                # 1. Check for Combined Index (index_key == table_name)
+                # Check for Combined Index (index_key == table_name)
                 if index_key in self.data:
                     try:
                         index = self._load_index(index_key)
@@ -139,22 +139,29 @@ class FaissVectorStore(VectorStoreInterface):
                     except Exception as e:
                         logger.warning(f"Failed to load combined index {index_key}: {e}")
                 
-                # 2. Check for Separated Index (index_key == table_name_col_enc)
-                else:
+                # Check for Separated Index (e.g., table_name_col_enc)
+                elif index_key.endswith("_enc"):
                     parts = index_key.rsplit('_', 1)
-                    # Check if the table name part exists in loaded data
-                    if len(parts) > 0 and parts[0] in self.data and parts[-1].endswith("_enc"):
-                        table_name = parts[0]
-                        try:
-                            index = self._load_index(index_key)
-                            self.enc_indexes[index_key] = index # Store in the separated dictionary
-                            self.table_map[index_key] = table_name 
-                            logger.info(f"Successfully loaded SEPARATED index: {index_key}")
-                        except Exception as e:
-                            logger.warning(f"Failed to load separated index {index_key}: {e}")
-                    else:
-                        logger.warning(f"Index {index_key} found but is orphaned or malformed.")
+                    table_name = index_key.rsplit('_', 2)[0] # Extract table name part
+                    
+                    try:
+                        index = self._load_index(index_key)
+                        self.enc_indexes[index_key] = index # Store in the separated dictionary
+                        self.table_map[index_key] = table_name # Map it back to the table name (needed for search)
+                        logger.info(f"Successfully loaded SEPARATED index: {index_key}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load separated index {index_key}: {e}")
+                
+                else:
+                    logger.warning(f"Index {index_key} found but does not match combined or separated format.")
         # ... (create_table, insert_data, and search implementations from the previous response)
+    
+    async def get_table_schema(self, table_name: str) -> TableSchema:
+        """Retrieve the stored schema for a given table."""
+        if table_name in self.schemas:
+            return self.schemas[table_name]
+        # Raise an error if the table (schema) doesn't exist
+        raise DBOperationError(f"Table schema for '{table_name}' not found in FaissVectorStore.")
 
     async def create_table(self, table_name: str, df: pd.DataFrame, pk_columns: List[str], embed_type: str = "combined", embed_columns_names: List[str] = []) -> Dict[str, str]:
         # ... (implementation from previous response)
@@ -171,14 +178,14 @@ class FaissVectorStore(VectorStoreInterface):
 
         if embed_type == "combined":
             column_types["embed_columns_value"] = "text"
-            column_types["embeddings"] = f"vector({DEFAULT_DIMENTION})"
-            self.indexes[table_name] = faiss.IndexFlatL2(DEFAULT_DIMENTION)
+            column_types["embeddings"] = f"vector({DEFAULT_DIMENSION})"
+            self.indexes[table_name] = faiss.IndexFlatL2(DEFAULT_DIMENSION)
         else:
             for col in embed_columns_names:
                 col_enc = f"{col}_enc"
-                column_types[col_enc] = f"vector({DEFAULT_DIMENTION})"
+                column_types[col_enc] = f"vector({DEFAULT_DIMENSION})"
                 index_key = f"{table_name}_{col_enc}"
-                self.enc_indexes[index_key] = faiss.IndexFlatL2(DEFAULT_DIMENTION)
+                self.enc_indexes[index_key] = faiss.IndexFlatL2(DEFAULT_DIMENSION)
                 self.table_map[index_key] = table_name
 
         self.schemas[table_name] = TableSchema(

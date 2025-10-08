@@ -2,19 +2,23 @@ import pandas as pd
 from typing import List, Dict, Any
 import chromadb
 import json
+import os
 from chromadb.config import Settings
-from src.dataload.interfaces.vector_store import VectorStoreInterface
-from src.dataload.domain.entities import (
+from dataload.interfaces.vector_store import VectorStoreInterface
+from dataload.domain.entities import (
     DataValidationError,
     DBOperationError,
     TableSchema,
 )
-from src.dataload.config import DEFAULT_DIMENTION, logger
+from dataload.config import DEFAULT_DIMENSION, logger
 
 
 class ChromaVectorStore(VectorStoreInterface):
     """ChromaDB vector store implementation with persistent and in-memory modes."""
 
+    # FIX: Define abstract property required by parent interface
+    EXTRA_COLUMNS = ["embed_columns_names", "embed_columns_value", "embeddings", "is_active"] 
+    
     def __init__(self, mode: str = "persistent", path: str = "./chroma_db"):
         """
         Initialize ChromaVectorStore.
@@ -23,6 +27,7 @@ class ChromaVectorStore(VectorStoreInterface):
             mode (str): 'persistent' for disk-based storage or 'in-memory' for RAM-only.
             path (str): Directory for persistent storage (ignored in 'in-memory' mode).
         """
+        # ... (Client initialization remains the same)
         self.mode = mode
         self.path = path if mode == "persistent" else None
         self.client = self._create_client()
@@ -31,8 +36,6 @@ class ChromaVectorStore(VectorStoreInterface):
         self.data: Dict[str, pd.DataFrame] = {}  # For simulating relational data
         if self.mode == "persistent":
             self._load_existing_collections()
-    
-    
 
     def _load_existing_collections(self):
         """Load all existing collection objects from the persistent client."""
@@ -40,14 +43,9 @@ class ChromaVectorStore(VectorStoreInterface):
             list_collections = self.client.list_collections()
             for collection_info in list_collections:
                 name = collection_info.name
-                # Get the actual collection object from the client
                 collection = self.client.get_collection(name=name)
                 self.collections[name] = collection
                 logger.info(f"Loaded existing Chroma collection: {name}")
-
-            # Note: Schemas and in-memory data (`self.data`) are not persisted
-            # in this implementation, which might lead to other issues if you rely 
-            # on them being present on a fresh run without calling `execute` again.
 
         except Exception as e:
             logger.warning(f"Failed to load existing collections: {e}")
@@ -87,6 +85,19 @@ class ChromaVectorStore(VectorStoreInterface):
                 serialized[key] = str(value)
         return serialized
 
+    # FIX: Added implementation for the abstract method get_table_schema
+    async def get_table_schema(self, table_name: str) -> TableSchema:
+        """
+        Retrieves the schema for a Chroma collection.
+        Since Chroma is schemaless, it returns the internal schema saved during `create_table`.
+        """
+        if table_name not in self.schemas:
+            # For Chroma, if the schema isn't in memory, we assume it needs to be created.
+            raise DBOperationError(f"Table (collection) {table_name} schema not found in memory.")
+        
+        return self.schemas[table_name]
+
+
     async def create_table(
         self,
         table_name: str,
@@ -98,7 +109,9 @@ class ChromaVectorStore(VectorStoreInterface):
         """Create a table (collection) with schema."""
         if table_name in self.collections:
             logger.info(f"Table {table_name} already exists, returning schema")
-            return self.schemas[table_name].columns
+            # Ensure the schema is available if the collection was loaded but schema was not persisted
+            if table_name in self.schemas:
+                 return self.schemas[table_name].columns
 
         if not all(col in df.columns for col in pk_columns):
             raise DataValidationError(
@@ -109,10 +122,10 @@ class ChromaVectorStore(VectorStoreInterface):
         column_types["embed_columns_names"] = "text[]"
         if embed_type == "combined":
             column_types["embed_columns_value"] = "text"
-            column_types["embeddings"] = f"vector({DEFAULT_DIMENTION})"
+            column_types["embeddings"] = f"vector({DEFAULT_DIMENSION})" 
         else:
             for col in embed_columns_names:
-                column_types[f"{col}_enc"] = f"vector({DEFAULT_DIMENTION})"
+                column_types[f"{col}_enc"] = f"vector({DEFAULT_DIMENSION})" 
         column_types["is_active"] = "boolean"
 
         self.schemas[table_name] = TableSchema(
@@ -305,9 +318,21 @@ class ChromaVectorStore(VectorStoreInterface):
         """Get embedding column names from schema."""
         if table_name not in self.schemas:
             raise DBOperationError(f"Table {table_name} not found")
-        return json.loads(
-            self.schemas[table_name].columns.get("embed_columns_names", "[]")
-        )
+        # Assuming embed_columns_names are stored as a JSON string in the schema dict
+        embed_names = self.schemas[table_name].columns.get("embed_columns_names")
+        if embed_names and isinstance(embed_names, str):
+            try:
+                # The create_table method sets this as text[] in the column_types, 
+                # but the value stored in the schema should be the actual list.
+                # If we assume the value is the list, we return it directly.
+                return json.loads(embed_names)
+            except json.JSONDecodeError:
+                # If it's a simple string, return an empty list or handle as appropriate
+                return []
+        
+        # Fallback to an in-memory check of the schema if the value is not a string (e.g., None)
+        return []
+
 
     async def get_data_columns(self, table_name: str) -> List[str]:
         """Get data columns excluding extra and embedding columns."""

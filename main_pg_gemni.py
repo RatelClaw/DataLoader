@@ -10,8 +10,18 @@ async def main():
     await db_conn.initialize()
     repo = PostgresDataRepository(db_conn)
     embedding = GeminiEmbeddingProvider()
-    # loader = LocalLoader()
-    # use_case = dataloadUseCase(repo, embedding, loader)
+    loader = LocalLoader()
+    use_case = dataloadUseCase(repo, embedding, loader)
+
+
+    # await use_case.execute(
+    #     'data_to_load/sample_2.csv',
+    #     'test_table_com_pg_gemini_st',
+    #     ['Name', 'Description'],
+    #     ['Index'],
+    #     create_table_if_not_exists=True,
+    #     embed_type=  'combined' #'separated'  # or 'combined'
+    # )
 
     # await use_case.execute(
     #     'data_to_load/sample.csv',
@@ -23,21 +33,21 @@ async def main():
     # )
 
     
-    # Retrieval example
+    # # Retrieval example
     query_text = "example project description"
     query_embedding = embedding.get_embeddings([query_text])[0]
 
     # For combined mode (uses 'embeddings' column)
-    # results = await repo.search('test_table_2', query_embedding, top_k=5)
-    # print("Combined mode retrieval results:")
-    # for result in results:
-    #     print(f"ID: {result['id']}, Document: {result['document']}, Distance: {result['distance']}, Metadata: {result['metadata']}")
-
-    # For separated mode (query specific _enc column, e.g., 'name_enc' or 'description_enc')
-    results = await repo.search('test_table_v4', query_embedding, top_k=2, embed_column='description_enc')
-    print("Separated mode retrieval results (description_enc):")
+    results = await repo.search('test_table_com_pg_gemini_st', query_embedding, top_k=5)
+    print("Combined mode retrieval results:")
     for result in results:
         print(f"ID: {result['id']}, Document: {result['document']}, Distance: {result['distance']}, Metadata: {result['metadata']}")
+
+    # # For separated mode (query specific _enc column, e.g., 'name_enc' or 'description_enc')
+    # results = await repo.search('test_table_v4', query_embedding, top_k=2, embed_column='description_enc')
+    # print("Separated mode retrieval results (description_enc):")
+    # for result in results:
+    #     print(f"ID: {result['id']}, Document: {result['document']}, Distance: {result['distance']}, Metadata: {result['metadata']}")
 
 
 if __name__ == '__main__':

@@ -3,9 +3,9 @@ from typing import List
 
 from openai import OpenAI
 
-from src.dataload.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.dataload.config import logger
-from src.dataload.domain.entities import EmbeddingError
+from dataload.interfaces.embedding_provider import EmbeddingProviderInterface
+from dataload.config import logger
+from dataload.domain.entities import EmbeddingError
 
 
 class OpenAIEmbeddingProvider(EmbeddingProviderInterface):

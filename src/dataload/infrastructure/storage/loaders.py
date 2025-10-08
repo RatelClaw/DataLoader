@@ -3,9 +3,9 @@ import pandas as pd
 import boto3
 from io import StringIO
 
-from src.dataload.interfaces.storage_loader import StorageLoaderInterface
-from src.dataload.config import logger
-from src.dataload.domain.entities import DBOperationError
+from dataload.interfaces.storage_loader import StorageLoaderInterface
+from dataload.config import logger
+from dataload.domain.entities import DBOperationError
 
 
 class S3Loader(StorageLoaderInterface):

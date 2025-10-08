@@ -10,6 +10,8 @@ async def main():
     await db_conn.initialize()
     repo = PostgresDataRepository(db_conn)
     embedding = SentenceTransformersProvider()
+
+
     # loader = LocalLoader()
     # use_case = dataloadUseCase(repo, embedding, loader)
 
@@ -25,18 +27,18 @@ async def main():
 
 
     # await use_case.execute(
-    #     'data_to_load/sample.csv',
+    #     'data_to_load/sample_2.csv',
     #     'test_table_v2_pg_st',
     #     ['Name', 'Description'],
     #     ['Index'],
     #     create_table_if_not_exists=True,
-    #     embed_type=  'combined' #'separated'  # or 'combined'
+    #     embed_type=  'separated' #'separated'  # or 'combined'
     # )
 
     # Retrieval example (commented)
     query_text = "example query"
     query_embedding = embedding.get_embeddings([query_text])[0]
-    results = await repo.search('test_table_v4_pg_st', query_embedding, top_k=1,)  # For separated mode
+    results = await repo.search('test_table_v2_pg_st', query_embedding, top_k=1,embed_column='Description_enc')   # For separated mode
     print("Retrieval results:")
     for result in results:
         print(f"ID: {result['id']}, Document: {result['document']}, Distance: {result['distance']}, Metadata: {result['metadata']}")
