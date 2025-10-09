@@ -1,6 +1,6 @@
 [project]
 name = "vector-dataloader"
-version = "1.2.0"
+version = "1.2.1"
 description = "Production-grade embedding loader for CSV data to vector stores with multiple providers."
 authors = [
 { name = "Shashwat Roy", email = "shashwatunf@gmail.com" }
@@ -51,7 +51,11 @@ all = [
 ]
 
 [project.scripts]
-dataload-run = "dataload.main:main"
+dataload-run = "dataload.main:run"
 [build-system]
 requires = ["setuptools>=70.0.0", "wheel>=0.44.0", "build>=1.2.0"]
 build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
