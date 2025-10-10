@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 import pandas as pd
+import numpy as np
 from typing import List, Dict, Optional
 from asyncpg.exceptions import PostgresError
-from src.dataload.domain.entities import (
+from dataload.domain.entities import (
     TableSchema,
     DBOperationError,
     DataValidationError,
 )
-from src.dataload.infrastructure.db.db_connection import DBConnection
-from src.dataload.config import logger, DEFAULT_DIMENTION
+from dataload.infrastructure.db.db_connection import DBConnection
+from dataload.config import logger, DEFAULT_DIMENSION
 from tenacity import retry, stop_after_attempt, wait_fixed
+import json
 
 
 class DataRepositoryInterface(ABC):
@@ -120,7 +122,7 @@ class PostgresDataRepository(DataRepositoryInterface):
             "int64": "bigint",
             "int32": "integer",
             "bool": "boolean",
-            "datetime64": "date",
+            "datetime64": "timestamp",
             "timedelta64": "interval",
         }
         column_types = {}
@@ -128,11 +130,11 @@ class PostgresDataRepository(DataRepositoryInterface):
         for col in df.columns:
             dtype = str(df[col].dtype)
             # Check if column contains lists (e.g., project_type, source_urls)
-            if df[col].apply(lambda x: isinstance(x, list)).any():
-                pg_type = "text[]"
+            if df[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
+                pg_type = "jsonb"
             else:
                 # Force text for ID columns
-                if "id" in col.lower():
+                if "id" in col.lower() or "index" in col.lower():
                     pg_type = "text"
                 else:
                     # For object columns, check if they are numeric-like
@@ -160,39 +162,83 @@ class PostgresDataRepository(DataRepositoryInterface):
                     else:
                         pg_type = pd_to_pg.get(dtype, "text")
             not_null = " NOT NULL" if col in pk_columns else ""
-            columns.append(f"{col} {pg_type}{not_null}")
+            columns.append(f'"{col}" {pg_type}{not_null}')
             column_types[col] = pg_type
         # Add embed_columns_names always
         columns = [c.strip() for c in columns if c and c.strip()]
-        columns.append("embed_columns_names text[]")
-        column_types["embed_columns_names"] = "text[]"
+        columns.append("embed_columns_names jsonb")
+        column_types["embed_columns_names"] = "jsonb"
         if embed_type == "combined":
             columns.append("embed_columns_value text")
-            columns.append(f"embeddings vector({DEFAULT_DIMENTION})")
+            columns.append(f"embeddings vector({DEFAULT_DIMENSION})")
             column_types["embed_columns_value"] = "text"
-            column_types["embeddings"] = f"vector({DEFAULT_DIMENTION})"
+            column_types["embeddings"] = f"vector({DEFAULT_DIMENSION})"
         elif embed_type == "separated":
             for col in embed_columns_names:
                 enc_col = f"{col}_enc"
-                columns.append(f"{enc_col} vector({DEFAULT_DIMENTION})")
-                column_types[enc_col] = f"vector({DEFAULT_DIMENTION})"
+                columns.append(f'"{enc_col}" vector({DEFAULT_DIMENSION})')
+                column_types[enc_col] = f"vector({DEFAULT_DIMENSION})"
         columns.append("is_active boolean DEFAULT true")
         column_types["is_active"] = "boolean"
         # Add primary key constraint
-        columns.append(f"PRIMARY KEY ({', '.join(pk_columns)})")
+        quoted_pk_columns = [f'"{col}"' for col in pk_columns]
+        columns.append(f"PRIMARY KEY ({', '.join(quoted_pk_columns)})")
+
+        # dataload/infrastructure/db/data_repository.py (Inside create_table method)
 
         query = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)})"
         try:
             async with self.db.get_connection() as conn:
                 async with conn.transaction():
                     await conn.execute(query)
+
+                    # --- CHANGE START: Switch to IVFFlat Index for high dimensions (e.g., 3072) ---
+                    # Determine vector columns to index
+                    if embed_type == "combined":
+                        embed_cols = ["embeddings"]
+                        # We use 100 for 'lists' as a reasonable starting point for small datasets.
+                        # Recommended lists = num_rows / 1000 to 2000, but using a fixed number is simpler here.
+                        ivfflat_params = "WITH (lists = 100)"
+                    else:
+                        embed_cols = [f"{col}_enc" for col in embed_columns_names]
+                        # IVFFlat index parameters for separated embeddings.
+                        ivfflat_params = "WITH (lists = 10)"
+
+                    for ec in embed_cols:
+                        # Use ivfflat instead of hnsw to avoid the 2000 dimension limit
+                        index_query = f"""
+                            CREATE INDEX IF NOT EXISTS idx_{table_name}_{ec} 
+                            ON {table_name} 
+                            USING ivfflat ("{ec}" vector_cosine_ops) 
+                            {ivfflat_params}
+                        """
+                        await conn.execute(index_query)
+                    # --- CHANGE END ---
+
             return column_types
         except PostgresError as e:
             logger.error(f"Table creation error: {e}")
             raise DBOperationError(f"Failed to create table {table_name}: {e}")
+        # query = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)})"
+        # try:
+        #     async with self.db.get_connection() as conn:
+        #         async with conn.transaction():
+        #             await conn.execute(query)
+        #             # Create hnsw indexes for vector columns
+        #             if embed_type == "combined":
+        #                 embed_cols = ["embeddings"]
+        #             else:
+        #                 embed_cols = [f"{col}_enc" for col in embed_columns_names]
+        #             for ec in embed_cols:
+        #                 index_query = f'CREATE INDEX IF NOT EXISTS idx_{table_name}_{ec} ON {table_name} USING hnsw ("{ec}" vector_cosine_ops) WITH (m = 16, ef_construction = 64)'
+        #                 await conn.execute(index_query)
+        #     return column_types
+        # except PostgresError as e:
+        #     logger.error(f"Table creation error: {e}")
+        #     raise DBOperationError(f"Failed to create table {table_name}: {e}")
 
     async def add_column(self, table_name: str, column_name: str, column_type: str):
-        query = f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+        query = f'ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS "{column_name}" {column_type}'
         try:
             async with self.db.get_connection() as conn:
                 async with conn.transaction():
@@ -203,16 +249,19 @@ class PostgresDataRepository(DataRepositoryInterface):
                 f"Failed to add column {column_name} to {table_name}: {e}"
             )
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
     async def insert_data(
         self, table_name: str, df: pd.DataFrame, pk_columns: List[str]
     ):
         if df.empty:
             return
-        columns = list(df.columns)
+        pandas_columns = list(df.columns)
+        sql_columns = [f'"{col}"' for col in pandas_columns]
         # Get column types from schema (or created table)
         try:
             schema = await self.get_table_schema(table_name)
             column_types = schema.columns
+            nullables = schema.nullables
         except DBOperationError:
             raise DBOperationError(
                 f"Table {table_name} must be created before insertion"
@@ -220,27 +269,28 @@ class PostgresDataRepository(DataRepositoryInterface):
 
         # Convert DataFrame values to match Postgres types
         df_converted = df.copy()
-        for col in columns:
+        for col in pandas_columns:
             pg_type = column_types.get(col, "text")
             if pg_type in ("integer", "bigint"):
-                df_converted[col] = (
-                    pd.to_numeric(df_converted[col], errors="coerce")
-                    .fillna(0)
-                    .astype("int64")
-                )
-                nan_count = df[col].isnull().sum()
-                if nan_count > 0:
-                    logger.warning(
-                        f"Column {col} had {nan_count} NaN values converted to 0"
+                df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
+                if nullables.get(col, True):
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: int(x) if pd.notnull(x) else None
                     )
-            elif pg_type == "date":
+                else:
+                    df_converted[col] = df_converted[col].fillna(0).apply(int)
+            elif pg_type == "double precision":
+                df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
+                if nullables.get(col, True):
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: float(x) if pd.notnull(x) else None
+                    )
+                else:
+                    df_converted[col] = df_converted[col].fillna(0.0).apply(float)
+            elif pg_type == "timestamp":
                 df_converted[col] = pd.to_datetime(df_converted[col], errors="coerce")
                 df_converted[col] = df_converted[col].apply(
                     lambda x: x if pd.notnull(x) else None
-                )
-            elif pg_type == "text[]":
-                df_converted[col] = df_converted[col].apply(
-                    lambda x: x if isinstance(x, list) else []
                 )
             elif pg_type == "boolean":
                 df_converted[col] = df_converted[col].apply(
@@ -250,13 +300,21 @@ class PostgresDataRepository(DataRepositoryInterface):
                 df_converted[col] = df_converted[col].apply(
                     lambda x: str(x) if pd.notnull(x) else None
                 )
-            elif pg_type == f"vector({DEFAULT_DIMENTION})":
+            elif pg_type == f"vector({DEFAULT_DIMENSION})":
                 df_converted[col] = df_converted[col].apply(
                     lambda x: [float(v) for v in x] if x is not None else None
                 )
+            elif pg_type == "jsonb":
+                df_converted[col] = df_converted[col].apply(
+                    lambda x: (
+                        json.dumps(x.tolist() if isinstance(x, np.ndarray) else x)
+                        if isinstance(x, (list, dict, np.ndarray))
+                        else (json.dumps(x) if pd.notnull(x) else None)
+                    )
+                )
 
         values = [tuple(row) for row in df_converted.itertuples(index=False, name=None)]
-        query = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(f'${i+1}' for i in range(len(columns)))})"
+        query = f"INSERT INTO {table_name} ({', '.join(sql_columns)}) VALUES ({', '.join(f'${i+1}' for i in range(len(sql_columns)))})"
         try:
             async with self.db.get_connection() as conn:
                 async with conn.transaction():
@@ -265,45 +323,62 @@ class PostgresDataRepository(DataRepositoryInterface):
             logger.error(f"Data insertion error: {e}")
             raise DBOperationError(f"Failed to insert data into {table_name}: {e}")
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
     async def update_data(
         self, table_name: str, df: pd.DataFrame, pk_columns: List[str]
     ):
         if df.empty:
             return
-        columns = list(df.columns)
+        pandas_columns = list(df.columns)
+        sql_columns = [f'"{col}"' for col in pandas_columns]
+        sql_pk_columns = [f'"{col}"' for col in pk_columns]
         set_clause = ", ".join(
-            [f"{col} = EXCLUDED.{col}" for col in columns if col not in pk_columns]
+            [
+                f'"{col}" = EXCLUDED."{col}"'
+                for col in pandas_columns
+                if col not in pk_columns
+            ]
         )
         query = f"""
-        INSERT INTO {table_name} ({', '.join(columns)})
-        VALUES ({', '.join(f'${i+1}' for i in range(len(columns)))})
-        ON CONFLICT ({', '.join(pk_columns)}) DO UPDATE SET {set_clause}
+        INSERT INTO {table_name} ({', '.join(sql_columns)})
+        VALUES ({', '.join(f'${i+1}' for i in range(len(sql_columns)))})
+        ON CONFLICT ({', '.join(sql_pk_columns)}) DO UPDATE SET {set_clause}
         """
         # Convert DataFrame values as in insert_data
         schema = await self.get_table_schema(table_name)
         column_types = schema.columns
+        nullables = schema.nullables
         df_converted = df.copy()
-        for col in columns:
+        for col in pandas_columns:
             pg_type = column_types.get(col, "text")
             if pg_type in ("integer", "bigint"):
-                df_converted[col] = (
-                    pd.to_numeric(df_converted[col], errors="coerce")
-                    .fillna(0)
-                    .astype("int64")
-                )
-                nan_count = df[col].isnull().sum()
-                if nan_count > 0:
-                    logger.warning(
-                        f"Column {col} had {nan_count} NaN values converted to 0"
+                df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
+                if nullables.get(col, True):
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: int(x) if pd.notnull(x) else None
                     )
-            elif pg_type == "date":
+                else:
+                    df_converted[col] = df_converted[col].fillna(0).apply(int)
+            elif pg_type == "double precision":
+                df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
+                if nullables.get(col, True):
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: float(x) if pd.notnull(x) else None
+                    )
+                else:
+                    df_converted[col] = df_converted[col].fillna(0.0).apply(float)
+            elif pg_type == "timestamp":
                 df_converted[col] = pd.to_datetime(df_converted[col], errors="coerce")
                 df_converted[col] = df_converted[col].apply(
                     lambda x: x if pd.notnull(x) else None
                 )
-            elif pg_type == "text[]":
+            elif pg_type == "jsonb":
                 df_converted[col] = df_converted[col].apply(
-                    lambda x: x if isinstance(x, list) else []
+                    lambda x: (
+                        json.dumps(x.tolist() if isinstance(x, np.ndarray) else x)
+                        if isinstance(x, (list, dict, np.ndarray))
+                        else (json.dumps(x) if pd.notnull(x) else None)
+                    )
                 )
             elif pg_type == "boolean":
                 df_converted[col] = df_converted[col].apply(
@@ -313,7 +388,7 @@ class PostgresDataRepository(DataRepositoryInterface):
                 df_converted[col] = df_converted[col].apply(
                     lambda x: str(x) if pd.notnull(x) else None
                 )
-            elif pg_type == f"vector({DEFAULT_DIMENTION})":
+            elif pg_type == f"vector({DEFAULT_DIMENSION})":
                 df_converted[col] = df_converted[col].apply(
                     lambda x: [float(v) for v in x] if x is not None else None
                 )
@@ -323,21 +398,33 @@ class PostgresDataRepository(DataRepositoryInterface):
             async with conn.transaction():
                 await conn.executemany(query, values)
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
     async def set_inactive(
         self, table_name: str, pks: List[tuple], pk_columns: List[str]
     ):
         if not pks:
             return
-        query = f"UPDATE {table_name} SET is_active = FALSE WHERE ({', '.join(pk_columns)}) IN (VALUES ($1{', $2' * (len(pk_columns)-1)})) AND is_active"
-        async with self.db.get_connection() as conn:
-            async with conn.transaction():
-                for pk in pks:
-                    await conn.execute(query, *pk)
+        sql_pk_columns = [f'"{col}"' for col in pk_columns]
+        num_pk_fields = len(pk_columns)
+        placeholders = [
+            f'({", ".join(f"${i + j * num_pk_fields}" for i in range(1, num_pk_fields + 1))})'
+            for j in range(len(pks))
+        ]
+        query = f"UPDATE {table_name} SET is_active = FALSE WHERE ({', '.join(sql_pk_columns)}) IN (VALUES {', '.join(placeholders)}) AND is_active = TRUE"
+        params = [val for pk in pks for val in pk]
+        try:
+            async with self.db.get_connection() as conn:
+                async with conn.transaction():
+                    await conn.execute(query, *params)
+        except PostgresError as e:
+            logger.error(f"Set inactive error: {e}")
+            raise DBOperationError(f"Failed to set inactive in {table_name}: {e}")
 
     async def get_active_data(
         self, table_name: str, columns: List[str]
     ) -> pd.DataFrame:
-        query = f"SELECT {', '.join(columns)} FROM {table_name} WHERE is_active"
+        sql_columns = [f'"{col}"' for col in columns]
+        query = f"SELECT {', '.join(sql_columns)} FROM {table_name} WHERE is_active"
         async with self.db.get_connection() as conn:
             rows = await conn.fetch(query)
         return pd.DataFrame(rows, columns=columns)
@@ -358,7 +445,7 @@ class PostgresDataRepository(DataRepositoryInterface):
             if col not in self.EXTRA_COLUMNS and not col.endswith("_enc")
         ]
 
-    # Insert this method into your PostgresDataRepository class 
+    # Insert this method into your PostgresDataRepository class
     # in src/dataload/infrastructure/db/data_repository.py
 
     async def search(
@@ -367,63 +454,81 @@ class PostgresDataRepository(DataRepositoryInterface):
         query_embedding: List[float],
         top_k: int = 5,
         embed_column: str = "embeddings",
+        id_column: Optional[str] = None,
     ) -> List[Dict]:
         """Performs vector similarity search using the pgvector <-> operator."""
-        
+
         # 1. Get relevant columns for the final result/metadata
         try:
             # data_columns excludes 'embeddings', 'embed_columns_names', etc.
             data_columns = await self.get_data_columns(table_name)
         except DBOperationError:
             # Fallback for search on an empty table (less likely in real scenarios)
-            data_columns = ["id", "name", "description"] 
-        
-        # Ensure 'id' is included for the result ID
-        if 'id' not in data_columns:
-            data_columns.append('id')
-            
+            data_columns = ["id", "name", "description"]
+
+        # Determine id_column if not provided
+        if id_column is None:
+            id_candidates = [
+                col
+                for col in data_columns
+                if "id" in col.lower() or "index" in col.lower()
+            ]
+            id_column = (
+                id_candidates[0]
+                if id_candidates
+                else (data_columns[0] if data_columns else "id")
+            )
+
+        # Ensure id_column is included for the result ID
+        if id_column not in data_columns:
+            data_columns.append(id_column)
+
         # 2. Construct the SQL query
         # The query retrieves all data columns, plus the calculated distance.
         # The ORDER BY clause is crucial for k-NN search using the '<->' operator.
+        data_sql = [f'"{col}"' for col in data_columns]
         query = f"""
         SELECT 
-            {', '.join(data_columns)}, 
-            {embed_column} <-> $1 AS distance
+            {', '.join(data_sql)}, 
+            "{embed_column}" <-> $1 AS distance
         FROM {table_name}
         WHERE is_active = TRUE
-        ORDER BY {embed_column} <-> $1
+        ORDER BY "{embed_column}" <-> $1
         LIMIT $2
         """
-        
-        # 3. Prepare the vector for asyncpg (pgvector expects an array string)
-        # pg_vector = "[" + ",".join(map(str, query_embedding)) + "]"
 
         try:
             async with self.db.get_connection() as conn:
-                rows = await conn.fetch(query, query_embedding, top_k) 
-                
+                rows = await conn.fetch(query, query_embedding, top_k)
+
             results = []
             for row in rows:
                 row_dict = dict(row)
-                
+
                 # Construct metadata dictionary by excluding control columns
                 metadata = {
-                    k: v 
-                    for k, v in row_dict.items() 
-                    if k in data_columns and k != 'id'
+                    k: v
+                    for k, v in row_dict.items()
+                    if k in data_columns and k != id_column
                 }
-                
+
                 # Determine the original text column that was embedded
                 # For 'description_enc', the document text should come from 'description'
-                document_column = embed_column.replace('_enc', '') if embed_column.endswith('_enc') else 'embed_columns_value'
-                document_text = row_dict.get(document_column, 'N/A')
+                document_column = (
+                    embed_column.replace("_enc", "")
+                    if embed_column.endswith("_enc")
+                    else "embed_columns_value"
+                )
+                document_text = row_dict.get(document_column, "N/A")
 
-                results.append({
-                    "id": str(row_dict.get('id', 'N/A')),
-                    "document": document_text,
-                    "distance": row_dict.get('distance', -1.0),
-                    "metadata": metadata,
-                })
+                results.append(
+                    {
+                        "id": str(row_dict.get(id_column, "N/A")),
+                        "document": document_text,
+                        "distance": row_dict.get("distance", -1.0),
+                        "metadata": metadata,
+                    }
+                )
             return results
 
         except PostgresError as e:

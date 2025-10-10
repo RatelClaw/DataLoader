@@ -1,10 +1,10 @@
 import pandas as pd
 from typing import List
-from src.dataload.domain.entities import DataValidationError, TableSchema
-from src.dataload.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.dataload.infrastructure.db.data_repository import DataRepositoryInterface
-from src.dataload.interfaces.storage_loader import StorageLoaderInterface
-from src.dataload.config import logger
+from dataload.domain.entities import DataValidationError, TableSchema
+from dataload.interfaces.embedding_provider import EmbeddingProviderInterface
+from dataload.infrastructure.db.data_repository import DataRepositoryInterface
+from dataload.interfaces.storage_loader import StorageLoaderInterface
+from dataload.config import logger
 
 
 class dataloadUseCase:

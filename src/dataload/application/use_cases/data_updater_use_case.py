@@ -1,10 +1,10 @@
 import pandas as pd
 from typing import List, Optional
-from src.dataload.domain.entities import DataValidationError
-from src.dataload.interfaces.embedding_provider import EmbeddingProviderInterface
-from src.dataload.infrastructure.db.data_repository import DataRepositoryInterface
-from src.dataload.interfaces.storage_loader import StorageLoaderInterface
-from src.dataload.config import logger, DEFAULT_DIMENTION
+from dataload.domain.entities import DataValidationError
+from dataload.interfaces.embedding_provider import EmbeddingProviderInterface
+from dataload.infrastructure.db.data_repository import DataRepositoryInterface
+from dataload.interfaces.storage_loader import StorageLoaderInterface
+from dataload.config import logger, DEFAULT_DIMENSION
 
 
 class DataUpdaterUseCase:
@@ -128,7 +128,7 @@ class DataUpdaterUseCase:
                 enc_col = f"{col}_enc"
                 if enc_col not in schema.columns:
                     await self.repo.add_column(
-                        table_name, enc_col, f"vector({DEFAULT_DIMENTION})"
+                        table_name, enc_col, f"vector({DEFAULT_DIMENSION})"
                     )
 
             # New and updated
