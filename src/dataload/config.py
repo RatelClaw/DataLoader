@@ -37,12 +37,16 @@ handler = logging.StreamHandler()
 handler.setFormatter(Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
 logger.addHandler(handler)
 
+
 class JSONFormatter(Formatter):
     """A formatter for JSON-structured logs."""
+
     def format(self, record):
-        return json.dumps({
-            "time": self.formatTime(record),
-            "name": record.name,
-            "level": record.levelname,
-            "msg": record.getMessage() # Use getMessage() for safer access
-        })
+        return json.dumps(
+            {
+                "time": self.formatTime(record),
+                "name": record.name,
+                "level": record.levelname,
+                "msg": record.getMessage(),  # Use getMessage() for safer access
+            }
+        )

@@ -9,9 +9,10 @@ from dataload.domain.entities import (
     DataValidationError,
 )
 from dataload.infrastructure.db.db_connection import DBConnection
-from dataload.config import logger, DEFAULT_DIMENSION 
+from dataload.config import logger, DEFAULT_DIMENSION
 from tenacity import retry, stop_after_attempt, wait_fixed
 import json
+
 
 class DataRepositoryInterface(ABC):
     @abstractmethod
@@ -165,7 +166,7 @@ class PostgresDataRepository(DataRepositoryInterface):
             column_types[col] = pg_type
         # Add embed_columns_names always
         columns = [c.strip() for c in columns if c and c.strip()]
-        columns.append("embed_columns_names jsonb") 
+        columns.append("embed_columns_names jsonb")
         column_types["embed_columns_names"] = "jsonb"
         if embed_type == "combined":
             columns.append("embed_columns_value text")
@@ -181,7 +182,7 @@ class PostgresDataRepository(DataRepositoryInterface):
         column_types["is_active"] = "boolean"
         # Add primary key constraint
         quoted_pk_columns = [f'"{col}"' for col in pk_columns]
-        columns.append(f"PRIMARY KEY ({', '.join(quoted_pk_columns)})") 
+        columns.append(f"PRIMARY KEY ({', '.join(quoted_pk_columns)})")
 
         # dataload/infrastructure/db/data_repository.py (Inside create_table method)
 
@@ -190,18 +191,18 @@ class PostgresDataRepository(DataRepositoryInterface):
             async with self.db.get_connection() as conn:
                 async with conn.transaction():
                     await conn.execute(query)
-                    
+
                     # --- CHANGE START: Switch to IVFFlat Index for high dimensions (e.g., 3072) ---
                     # Determine vector columns to index
                     if embed_type == "combined":
                         embed_cols = ["embeddings"]
                         # We use 100 for 'lists' as a reasonable starting point for small datasets.
                         # Recommended lists = num_rows / 1000 to 2000, but using a fixed number is simpler here.
-                        ivfflat_params = "WITH (lists = 100)" 
+                        ivfflat_params = "WITH (lists = 100)"
                     else:
                         embed_cols = [f"{col}_enc" for col in embed_columns_names]
                         # IVFFlat index parameters for separated embeddings.
-                        ivfflat_params = "WITH (lists = 10)" 
+                        ivfflat_params = "WITH (lists = 10)"
 
                     for ec in embed_cols:
                         # Use ivfflat instead of hnsw to avoid the 2000 dimension limit
@@ -213,7 +214,7 @@ class PostgresDataRepository(DataRepositoryInterface):
                         """
                         await conn.execute(index_query)
                     # --- CHANGE END ---
-                    
+
             return column_types
         except PostgresError as e:
             logger.error(f"Table creation error: {e}")
@@ -273,13 +274,17 @@ class PostgresDataRepository(DataRepositoryInterface):
             if pg_type in ("integer", "bigint"):
                 df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
                 if nullables.get(col, True):
-                    df_converted[col] = df_converted[col].apply(lambda x: int(x) if pd.notnull(x) else None)
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: int(x) if pd.notnull(x) else None
+                    )
                 else:
                     df_converted[col] = df_converted[col].fillna(0).apply(int)
             elif pg_type == "double precision":
                 df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
                 if nullables.get(col, True):
-                    df_converted[col] = df_converted[col].apply(lambda x: float(x) if pd.notnull(x) else None)
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: float(x) if pd.notnull(x) else None
+                    )
                 else:
                     df_converted[col] = df_converted[col].fillna(0.0).apply(float)
             elif pg_type == "timestamp":
@@ -301,7 +306,11 @@ class PostgresDataRepository(DataRepositoryInterface):
                 )
             elif pg_type == "jsonb":
                 df_converted[col] = df_converted[col].apply(
-                    lambda x: json.dumps(x.tolist() if isinstance(x, np.ndarray) else x) if isinstance(x, (list, dict, np.ndarray)) else (json.dumps(x) if pd.notnull(x) else None)
+                    lambda x: (
+                        json.dumps(x.tolist() if isinstance(x, np.ndarray) else x)
+                        if isinstance(x, (list, dict, np.ndarray))
+                        else (json.dumps(x) if pd.notnull(x) else None)
+                    )
                 )
 
         values = [tuple(row) for row in df_converted.itertuples(index=False, name=None)]
@@ -324,7 +333,11 @@ class PostgresDataRepository(DataRepositoryInterface):
         sql_columns = [f'"{col}"' for col in pandas_columns]
         sql_pk_columns = [f'"{col}"' for col in pk_columns]
         set_clause = ", ".join(
-            [f'"{col}" = EXCLUDED."{col}"' for col in pandas_columns if col not in pk_columns]
+            [
+                f'"{col}" = EXCLUDED."{col}"'
+                for col in pandas_columns
+                if col not in pk_columns
+            ]
         )
         query = f"""
         INSERT INTO {table_name} ({', '.join(sql_columns)})
@@ -341,13 +354,17 @@ class PostgresDataRepository(DataRepositoryInterface):
             if pg_type in ("integer", "bigint"):
                 df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
                 if nullables.get(col, True):
-                    df_converted[col] = df_converted[col].apply(lambda x: int(x) if pd.notnull(x) else None)
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: int(x) if pd.notnull(x) else None
+                    )
                 else:
                     df_converted[col] = df_converted[col].fillna(0).apply(int)
             elif pg_type == "double precision":
                 df_converted[col] = pd.to_numeric(df_converted[col], errors="coerce")
                 if nullables.get(col, True):
-                    df_converted[col] = df_converted[col].apply(lambda x: float(x) if pd.notnull(x) else None)
+                    df_converted[col] = df_converted[col].apply(
+                        lambda x: float(x) if pd.notnull(x) else None
+                    )
                 else:
                     df_converted[col] = df_converted[col].fillna(0.0).apply(float)
             elif pg_type == "timestamp":
@@ -357,7 +374,11 @@ class PostgresDataRepository(DataRepositoryInterface):
                 )
             elif pg_type == "jsonb":
                 df_converted[col] = df_converted[col].apply(
-                    lambda x: json.dumps(x.tolist() if isinstance(x, np.ndarray) else x) if isinstance(x, (list, dict, np.ndarray)) else (json.dumps(x) if pd.notnull(x) else None)
+                    lambda x: (
+                        json.dumps(x.tolist() if isinstance(x, np.ndarray) else x)
+                        if isinstance(x, (list, dict, np.ndarray))
+                        else (json.dumps(x) if pd.notnull(x) else None)
+                    )
                 )
             elif pg_type == "boolean":
                 df_converted[col] = df_converted[col].apply(
@@ -385,7 +406,10 @@ class PostgresDataRepository(DataRepositoryInterface):
             return
         sql_pk_columns = [f'"{col}"' for col in pk_columns]
         num_pk_fields = len(pk_columns)
-        placeholders = [f'({", ".join(f"${i + j * num_pk_fields}" for i in range(1, num_pk_fields + 1))})' for j in range(len(pks))]
+        placeholders = [
+            f'({", ".join(f"${i + j * num_pk_fields}" for i in range(1, num_pk_fields + 1))})'
+            for j in range(len(pks))
+        ]
         query = f"UPDATE {table_name} SET is_active = FALSE WHERE ({', '.join(sql_pk_columns)}) IN (VALUES {', '.join(placeholders)}) AND is_active = TRUE"
         params = [val for pk in pks for val in pk]
         try:
@@ -421,7 +445,7 @@ class PostgresDataRepository(DataRepositoryInterface):
             if col not in self.EXTRA_COLUMNS and not col.endswith("_enc")
         ]
 
-    # Insert this method into your PostgresDataRepository class 
+    # Insert this method into your PostgresDataRepository class
     # in src/dataload/infrastructure/db/data_repository.py
 
     async def search(
@@ -433,24 +457,32 @@ class PostgresDataRepository(DataRepositoryInterface):
         id_column: Optional[str] = None,
     ) -> List[Dict]:
         """Performs vector similarity search using the pgvector <-> operator."""
-        
+
         # 1. Get relevant columns for the final result/metadata
         try:
             # data_columns excludes 'embeddings', 'embed_columns_names', etc.
             data_columns = await self.get_data_columns(table_name)
         except DBOperationError:
             # Fallback for search on an empty table (less likely in real scenarios)
-            data_columns = ["id", "name", "description"] 
-        
+            data_columns = ["id", "name", "description"]
+
         # Determine id_column if not provided
         if id_column is None:
-            id_candidates = [col for col in data_columns if 'id' in col.lower() or 'index' in col.lower()]
-            id_column = id_candidates[0] if id_candidates else (data_columns[0] if data_columns else "id")
-            
+            id_candidates = [
+                col
+                for col in data_columns
+                if "id" in col.lower() or "index" in col.lower()
+            ]
+            id_column = (
+                id_candidates[0]
+                if id_candidates
+                else (data_columns[0] if data_columns else "id")
+            )
+
         # Ensure id_column is included for the result ID
         if id_column not in data_columns:
             data_columns.append(id_column)
-            
+
         # 2. Construct the SQL query
         # The query retrieves all data columns, plus the calculated distance.
         # The ORDER BY clause is crucial for k-NN search using the '<->' operator.
@@ -464,33 +496,39 @@ class PostgresDataRepository(DataRepositoryInterface):
         ORDER BY "{embed_column}" <-> $1
         LIMIT $2
         """
-        
+
         try:
             async with self.db.get_connection() as conn:
-                rows = await conn.fetch(query, query_embedding, top_k) 
-                
+                rows = await conn.fetch(query, query_embedding, top_k)
+
             results = []
             for row in rows:
                 row_dict = dict(row)
-                
+
                 # Construct metadata dictionary by excluding control columns
                 metadata = {
-                    k: v 
-                    for k, v in row_dict.items() 
+                    k: v
+                    for k, v in row_dict.items()
                     if k in data_columns and k != id_column
                 }
-                
+
                 # Determine the original text column that was embedded
                 # For 'description_enc', the document text should come from 'description'
-                document_column = embed_column.replace('_enc', '') if embed_column.endswith('_enc') else 'embed_columns_value'
-                document_text = row_dict.get(document_column, 'N/A')
+                document_column = (
+                    embed_column.replace("_enc", "")
+                    if embed_column.endswith("_enc")
+                    else "embed_columns_value"
+                )
+                document_text = row_dict.get(document_column, "N/A")
 
-                results.append({
-                    "id": str(row_dict.get(id_column, 'N/A')),
-                    "document": document_text,
-                    "distance": row_dict.get('distance', -1.0),
-                    "metadata": metadata,
-                })
+                results.append(
+                    {
+                        "id": str(row_dict.get(id_column, "N/A")),
+                        "document": document_text,
+                        "distance": row_dict.get("distance", -1.0),
+                        "metadata": metadata,
+                    }
+                )
             return results
 
         except PostgresError as e:

@@ -1,9 +1,5 @@
-# vector-dataloader: Embedding Loader Package
 
-**vector-dataloader** is a robust, extensible Python library for loading CSV data from S3 or local files into vector stores (**Postgres**, **FAISS**, **Chroma**) with embedding generation. It supports multiple embedding providers (**AWS Bedrock**, **Google Gemini**, **Sentence-Transformers**, **OpenAI**) and two embedding modes:
-
-- **Combined**: Concatenated text with a single embedding.
-- **Separated**: Individual embeddings per column.
+**vector-dataloader** is a robust, extensible Python library for loading CSV data from S3 or local files into vector stores (**Postgres**, **FAISS**, **Chroma**) with embedding generation. It supports multiple embedding providers (**AWS Bedrock**, **Google Gemini**, **Sentence-Transformers**, **OpenAI**) and two embedding modes.
 
 ## 🚀 Features
 
@@ -16,46 +12,61 @@
 - **Extensibility**: Plugin-style for providers and stores.
 - **Validation**: Schema, type, null checks.
 
----## Setup Instructions
+---
+## 📦 Installation (Lazy Imports Enabled!)
 
-To use this repo:
+You only need to install the core package and the optional dependencies for the providers and stores you actually use.
 
-`````bash
-git clone <repo-url>
-cd DataLoader
-uv venv
-.venv\Scripts\activate   # On Windows
-# source .venv/bin/activate   # On Linux/Mac
-uv pip install -r requirements.txt
-uv pip install -e .[all,dev]
+Install the core package:
 
-uv run main_local.py
-# or
-uv run main.py
 
-## 📦 Installation
-
-Install via pip or uv:
-
+All Features	
+Installs all optional dependencies.
 ````bash
+pip install vector-dataloader[all]
 pip install vector-dataloader
 # or
 uv add vector-dataloader
 
-Install optional dependencies for specific providers/stores:
-pip install vector-dataloader[chroma,gemini]
-# or
-uv add vector-dataloader[chroma,gemini]
 
-Available extras: gemini, sentence-transformers, openai, faiss, chroma, all.
+Optional Dependencies (Extras)
+Use the following commands to install required extras.
+
+Combination	Pip Install Command	Notes
+ChromaDB only	pip install vector-dataloader[chroma]	Required for ChromaVectorStore.
+FAISS only	pip install vector-dataloader[faiss]	Required for FaissVectorStore.
+Google Gemini	pip install vector-dataloader[gemini]	Required for GeminiEmbeddingProvider.
+Sentence-Transformers	pip install vector-dataloader[sentence-transformers]	Required for SentenceTransformersProvider.
+OpenAI	pip install vector-dataloader[openai]	Required for OpenAIProvider.
+All Features	pip install vector-dataloader[all]	Installs all optional dependencies.
+
+Export to Sheets
+Example: To use Postgres (core package) with the Gemini provider:
+
+Bash
+
+pip install vector-dataloader[gemini]
+Example: To use ChromaDB with Sentence-Transformers:
+
+Bash
+
+pip install vector-dataloader[chroma,sentence-transformers]
 ⚙️ Usage
-Below are example scripts for different combinations of vector stores and embedding providers. Save these as separate files (e.g., main_chroma_gemni.py) and run with uv run <filename>.py or python <filename>.py.
+Below are example scripts for different combinations. Note that Postgres tests require setting up the connection parameters in a .env file.
+
 Chroma with Gemini
+Bash
+
+# PIP INSTALL REQUIRED:
+pip install vector-dataloader[chroma,gemini]
+Python
+
 import asyncio
-from dataload.infrastructure.vector_stores.chroma_store import ChromaVectorStore
-from dataload.infrastructure.storage.loaders import LocalLoader
-from dataload.application.services.embedding.gemini_provider import GeminiEmbeddingProvider
-from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
+# Imports now use the package name 'vector_dataloader'
+from vector_dataloader.infrastructure.vector_stores.chroma_store import ChromaVectorStore
+from vector_dataloader.infrastructure.storage.loaders import LocalLoader
+from vector_dataloader.application.services.embedding.gemini_provider import GeminiEmbeddingProvider
+from vector_dataloader.application.use_cases.data_loader_use_case import dataloadUseCase
 
 async def main():
     repo = ChromaVectorStore(mode='persistent', path='./my_chroma_db')
@@ -65,7 +76,7 @@ async def main():
 
     await use_case.execute(
         'data_to_load/sample.csv',
-        'test_table',
+        'test_table_chroma_gemini',
         ['name', 'description'],
         ['id'],
         create_table_if_not_exists=True,
@@ -74,63 +85,18 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-
-Chroma with Sentence-Transformers
-import asyncio
-from dataload.infrastructure.vector_stores.chroma_store import ChromaVectorStore
-from dataload.infrastructure.storage.loaders import LocalLoader
-from dataload.application.services.embedding.sentence_transformers_provider import SentenceTransformersProvider
-from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
-
-async def main():
-    repo = ChromaVectorStore(mode='persistent', path='./my_chroma_db')
-    embedding = SentenceTransformersProvider()
-    loader = LocalLoader()
-    use_case = dataloadUseCase(repo, embedding, loader)
-
-    await use_case.execute(
-        'data_to_load/sample.csv',
-        'test_table',
-        ['name', 'description'],
-        ['id'],
-        create_table_if_not_exists=True,
-        embed_type='separated'
-    )
-
-if __name__ == '__main__':
-    asyncio.run(main())
-
-FAISS with Gemini
-import asyncio
-from dataload.infrastructure.vector_stores.faiss_store import FaissVectorStore
-from dataload.infrastructure.storage.loaders import LocalLoader
-from dataload.application.services.embedding.gemini_provider import GeminiEmbeddingProvider
-from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
-
-async def main():
-    repo = FaissVectorStore()
-    embedding = GeminiEmbeddingProvider()
-    loader = LocalLoader()
-    use_case = dataloadUseCase(repo, embedding, loader)
-
-    await use_case.execute(
-        'data_to_load/sample.csv',
-        'test_table',
-        ['name', 'description'],
-        ['id'],
-        create_table_if_not_exists=True,
-        embed_type='separated'
-    )
-
-if __name__ == '__main__':
-    asyncio.run(main())
-
 FAISS with Sentence-Transformers
+Bash
+
+# PIP INSTALL REQUIRED:
+pip install vector-dataloader[faiss,sentence-transformers]
+Python
+
 import asyncio
-from dataload.infrastructure.vector_stores.faiss_store import FaissVectorStore
-from dataload.infrastructure.storage.loaders import LocalLoader
-from dataload.application.services.embedding.sentence_transformers_provider import SentenceTransformersProvider
-from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
+from vector_dataloader.infrastructure.vector_stores.faiss_store import FaissVectorStore
+from vector_dataloader.infrastructure.storage.loaders import LocalLoader
+from vector_dataloader.application.services.embedding.sentence_transformers_provider import SentenceTransformersProvider
+from vector_dataloader.application.use_cases.data_loader_use_case import dataloadUseCase
 
 async def main():
     repo = FaissVectorStore()
@@ -140,7 +106,7 @@ async def main():
 
     await use_case.execute(
         'data_to_load/sample.csv',
-        'test_table',
+        'test_table_faiss_st',
         ['name', 'description'],
         ['id'],
         create_table_if_not_exists=True,
@@ -149,14 +115,19 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-
 Postgres with Gemini
+Bash
+
+# PIP INSTALL REQUIRED:
+pip install vector-dataloader[gemini]
+Python
+
 import asyncio
-from dataload.infrastructure.db.db_connection import DBConnection
-from dataload.infrastructure.db.data_repository import PostgresDataRepository
-from dataload.infrastructure.storage.loaders import LocalLoader
-from dataload.application.services.embedding.gemini_provider import GeminiEmbeddingProvider
-from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
+from vector_dataloader.infrastructure.db.db_connection import DBConnection
+from vector_dataloader.infrastructure.db.data_repository import PostgresDataRepository
+from vector_dataloader.infrastructure.storage.loaders import LocalLoader
+from vector_dataloader.application.services.embedding.gemini_provider import GeminiEmbeddingProvider
+from vector_dataloader.application.use_cases.data_loader_use_case import dataloadUseCase
 
 async def main():
     db_conn = DBConnection()
@@ -168,43 +139,18 @@ async def main():
 
     await use_case.execute(
         'data_to_load/sample.csv',
-        'test_table',
+        'test_table_pg_gemini',
         ['name', 'description'],
         ['id'],
         create_table_if_not_exists=True,
         embed_type='separated'
     )
+    # Don't forget to close the connection
+    await db_conn.close()
 
 if __name__ == '__main__':
     asyncio.run(main())
 
-Postgres with Sentence-Transformers
-import asyncio
-from dataload.infrastructure.db.db_connection import DBConnection
-from dataload.infrastructure.db.data_repository import PostgresDataRepository
-from dataload.infrastructure.storage.loaders import LocalLoader
-from dataload.application.services.embedding.sentence_transformers_provider import SentenceTransformersProvider
-from dataload.application.use_cases.data_loader_use_case import dataloadUseCase
-
-async def main():
-    db_conn = DBConnection()
-    await db_conn.initialize()
-    repo = PostgresDataRepository(db_conn)
-    embedding = SentenceTransformersProvider()
-    loader = LocalLoader()
-    use_case = dataloadUseCase(repo, embedding, loader)
-
-    await use_case.execute(
-        'data_to_load/sample.csv',
-        'test_table',
-        ['name', 'description'],
-        ['id'],
-        create_table_if_not_exists=True,
-        embed_type='separated'
-    )
-
-if __name__ == '__main__':
-    asyncio.run(main())
 
 ⚙️ Configuring Environment Variables
 dataload uses environment variables for configuration, loaded from a .env file or system variables.
