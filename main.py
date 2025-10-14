@@ -56,3 +56,11 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# uv run main_pg_st.py  done
+# uv run main_pg_gemni.py  done
+# uv run main_chroma_gemni.py  done
+# uv run main_faiss_gemni.py  done
+# uv run main_faiss_st.py  done
+# uv run main_chroma_st.py  done
