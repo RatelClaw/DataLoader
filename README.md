@@ -2,14 +2,25 @@ vector-dataloader
 vector-dataloader is a robust and extensible Python library for loading CSV data from local files or S3 into vector stores (Postgres, FAISS, Chroma) with embedding generation. It supports multiple embedding providers (AWS Bedrock, Google Gemini, Sentence-Transformers, OpenAI) and offers flexible embedding modes for scalable data processing.
 🚀 Features
 
-Data Sources: Load data from local CSV files or AWS S3.
-Embedding Modes: Supports combined or separated embedding generation.
-Embedding Providers: AWS Bedrock, Google Gemini, Sentence-Transformers, OpenAI.
-Vector Stores: Postgres (with pgvector), FAISS (in-memory), Chroma (persistent).
-Data Updates: Handles new, updated, or removed rows with soft delete support.
-Scalability: Batch processing, retries, and connection pooling for efficient operations.
-Extensibility: Modular plugin-style architecture for providers and stores.
-Validation: Enforces schema, type, and null checks for data integrity.
+**Core Data Loading:**
+- Data Sources: Load data from local CSV files or AWS S3.
+- Embedding Modes: Supports combined or separated embedding generation.
+- Embedding Providers: AWS Bedrock, Google Gemini, Sentence-Transformers, OpenAI.
+- Vector Stores: Postgres (with pgvector), FAISS (in-memory), Chroma (persistent).
+- Data Updates: Handles new, updated, or removed rows with soft delete support.
+- Scalability: Batch processing, retries, and connection pooling for efficient operations.
+- Extensibility: Modular plugin-style architecture for providers and stores.
+- Validation: Enforces schema, type, and null checks for data integrity.
+
+**DataMove Use Case (New!):**
+- Production-grade data migration from CSV to PostgreSQL without embedding generation
+- Flexible schema validation with strict and flexible modes
+- Automatic table creation and schema evolution
+- Case-sensitivity conflict detection and prevention
+- Comprehensive error handling with automatic rollback
+- S3 integration with automatic loader selection
+- Performance optimization with configurable batch processing
+- Dry-run validation for previewing operations
 
 📦 Installation
 Prerequisites
@@ -474,6 +485,87 @@ should be configured in the environment
 set use_aws=True in DBConnection.
 Ensure the input CSV file exists and matches the expected schema.
 
+
+## DataMove Use Case
+
+The DataMove use case provides production-grade data migration from CSV files to PostgreSQL databases without embedding generation. Perfect for ETL pipelines and data migration scenarios.
+
+### Quick Start
+
+```python
+import asyncio
+from dataload.application.use_cases.data_move_use_case import DataMoveUseCase
+from dataload.infrastructure.db.postgres_data_move_repository import PostgresDataMoveRepository
+from dataload.infrastructure.db.db_connection import DBConnection
+
+async def migrate_data():
+    # Set up database connection
+    db_connection = DBConnection()
+    await db_connection.initialize()
+    
+    # Create repository and use case
+    repository = PostgresDataMoveRepository(db_connection)
+    use_case = DataMoveUseCase.create_with_auto_loader(repository=repository)
+    
+    # Migrate data (creates table automatically)
+    result = await use_case.execute(
+        csv_path="employees.csv",  # or "s3://bucket/file.csv"
+        table_name="employees",
+        primary_key_columns=["id"]
+    )
+    
+    print(f"✅ Migrated {result.rows_processed} rows in {result.execution_time:.2f}s")
+    await db_connection.close()
+
+asyncio.run(migrate_data())
+```
+
+### Key Features
+
+- **Automatic Table Creation**: Creates tables from CSV schema
+- **Schema Validation**: Strict (`existing_schema`) and flexible (`new_schema`) modes
+- **S3 Integration**: Automatic detection of S3 URIs
+- **Error Handling**: Comprehensive validation with rollback on failures
+- **Performance**: Configurable batch processing and memory management
+- **Dry Run**: Preview operations without making changes
+
+### Validation Modes
+
+```python
+# Create new table (automatic)
+result = await use_case.execute(
+    csv_path="data.csv",
+    table_name="new_table"
+)
+
+# Strict validation (exact schema match)
+result = await use_case.execute(
+    csv_path="data.csv", 
+    table_name="existing_table",
+    move_type="existing_schema"
+)
+
+# Flexible validation (allows schema changes)
+result = await use_case.execute(
+    csv_path="evolved_data.csv",
+    table_name="existing_table", 
+    move_type="new_schema"
+)
+
+# Preview changes (dry run)
+result = await use_case.execute(
+    csv_path="data.csv",
+    table_name="target_table",
+    dry_run=True
+)
+```
+
+### Documentation
+
+- **[Quick Start Guide](docs/datamove_quick_start_guide.md)**: Get started in 5 minutes
+- **[API Documentation](docs/datamove_api_documentation.md)**: Complete API reference
+- **[Troubleshooting Guide](docs/datamove_troubleshooting_guide.md)**: Common issues and solutions
+- **[Comprehensive Examples](examples/data_move_comprehensive_example.py)**: Production-ready examples
 
 📚 License
 MIT LicenseCopyright (c) 2025 Shashwat Roy  
