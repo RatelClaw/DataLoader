@@ -7,8 +7,8 @@ import pandas as pd
 from unittest.mock import AsyncMock, Mock, patch
 import asyncio
 
-from src.dataload.application.use_cases.data_move_use_case import DataMoveUseCase
-from src.dataload.domain.entities import (
+from dataload.application.use_cases.data_move_use_case import DataMoveUseCase
+from dataload.domain.entities import (
     DataMoveError,
     ValidationError,
     DatabaseOperationError,
@@ -56,7 +56,7 @@ class MockRepository:
         if "get_table_info" in self.should_fail_on:
             raise DatabaseOperationError("Mock get_table_info failure")
         
-        from src.dataload.domain.entities import TableInfo, ColumnInfo
+        from dataload.domain.entities import TableInfo, ColumnInfo
         return TableInfo(
             name=table_name,
             columns={

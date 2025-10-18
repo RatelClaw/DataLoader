@@ -754,57 +754,35 @@ class PostgresDataMoveRepository(DataMoveRepositoryInterface):
         Raises:
             DatabaseOperationError: If transaction management fails
         """
-        connection = None
-        transaction_started = False
-        
         try:
-            # Get database connection with retry logic
-            connection = await self._get_connection_with_retry()
-            logger.debug("Acquired database connection for transaction")
-            
-            # Start transaction
-            transaction = connection.transaction()
-            await transaction.start()
-            transaction_started = True
-            logger.debug("Transaction started successfully")
-            
-            try:
-                yield connection
+            # Get database connection using the async context manager
+            async with self.db.get_connection() as connection:
+                logger.debug("Acquired database connection for transaction")
                 
-                # Commit transaction if no exceptions occurred
-                await transaction.commit()
-                logger.debug("Transaction committed successfully")
-                
-            except Exception as operation_error:
-                # Rollback transaction on any operation failure
-                logger.warning(f"Operation failed, rolling back transaction: {operation_error}")
-                
-                try:
-                    await transaction.rollback()
-                    logger.info("Transaction rolled back successfully")
-                except Exception as rollback_error:
-                    logger.error(f"Rollback failed: {rollback_error}")
-                    raise DatabaseOperationError(
-                        f"Operation failed and rollback also failed: {rollback_error}",
-                        {
-                            "original_error": str(operation_error),
-                            "rollback_error": str(rollback_error),
-                            "error_type": "rollback_failed"
-                        }
-                    ) from rollback_error
-                
-                # Re-raise the original operation error
-                if isinstance(operation_error, (DatabaseOperationError, ValidationError)):
-                    raise operation_error
-                else:
-                    raise DatabaseOperationError(
-                        f"Transaction operation failed: {operation_error}",
-                        {
-                            "original_error": str(operation_error),
-                            "error_type": "transaction_operation_failed",
-                            "exception_type": type(operation_error).__name__
-                        }
-                    ) from operation_error
+                # Start transaction
+                async with connection.transaction():
+                    logger.debug("Transaction started successfully")
+                    
+                    try:
+                        yield connection
+                        logger.debug("Transaction committed successfully")
+                        
+                    except Exception as operation_error:
+                        # The transaction context manager will automatically rollback
+                        logger.warning(f"Operation failed, transaction will be rolled back: {operation_error}")
+                        
+                        # Re-raise the original operation error
+                        if isinstance(operation_error, (DatabaseOperationError, ValidationError)):
+                            raise operation_error
+                        else:
+                            raise DatabaseOperationError(
+                                f"Transaction operation failed: {operation_error}",
+                                {
+                                    "original_error": str(operation_error),
+                                    "error_type": "transaction_operation_failed",
+                                    "exception_type": type(operation_error).__name__
+                                }
+                            ) from operation_error
                     
         except DatabaseOperationError:
             # Re-raise database operation errors as-is
@@ -823,13 +801,9 @@ class PostgresDataMoveRepository(DataMoveRepositoryInterface):
             logger.error(error_msg, exc_info=True)
             raise DatabaseOperationError(error_msg, {
                 "error_type": "transaction_management_failed",
-                "transaction_started": transaction_started,
                 "original_error": str(e),
                 "exception_type": type(e).__name__
             }) from e
-            
-        finally:
-            # Ensure connection is properly closed
             if connection:
                 try:
                     await connection.close()
@@ -837,54 +811,9 @@ class PostgresDataMoveRepository(DataMoveRepositoryInterface):
                 except Exception as close_error:
                     logger.warning(f"Error closing database connection: {close_error}")
 
-    async def _get_connection_with_retry(self, max_retries: int = 3, retry_delay: float = 1.0):
-        """
-        Get database connection with retry logic and comprehensive error handling.
-        
-        Args:
-            max_retries: Maximum number of connection attempts
-            retry_delay: Delay between retry attempts in seconds
-            
-        Returns:
-            Database connection
-            
-        Raises:
-            DatabaseOperationError: If connection fails after all retries
-        """
-        last_error = None
-        
-        for attempt in range(max_retries):
-            try:
-                connection = await self.db.get_connection()
-                logger.debug(f"Database connection established on attempt {attempt + 1}")
-                return connection
-                
-            except ConnectionError as e:
-                last_error = e
-                logger.warning(f"Connection attempt {attempt + 1} failed: {e}")
-                
-                if attempt < max_retries - 1:
-                    logger.info(f"Retrying connection in {retry_delay} seconds...")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 1.5  # Exponential backoff
-                    
-            except Exception as e:
-                last_error = e
-                logger.error(f"Unexpected error during connection attempt {attempt + 1}: {e}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 1.5
-        
-        # All retry attempts failed
-        error_msg = f"Failed to establish database connection after {max_retries} attempts"
-        logger.error(f"{error_msg}. Last error: {last_error}")
-        raise DatabaseOperationError(error_msg, {
-            "error_type": "connection_retry_exhausted",
-            "max_retries": max_retries,
-            "last_error": str(last_error),
-            "exception_type": type(last_error).__name__ if last_error else "unknown"
-        }) from last_error
+    # Note: This method is not currently used and has been removed to avoid
+    # async context manager confusion. The @retry decorator on individual methods
+    # provides sufficient retry logic for database operations.
 
     async def execute_in_transaction(self, operations: List[callable]) -> bool:
         """

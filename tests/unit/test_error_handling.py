@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, Mock
 
-from src.dataload.application.services.error_handling import (
+from dataload.application.services.error_handling import (
     ErrorCollector,
     ErrorHandler,
     ErrorSeverity,
@@ -14,7 +14,7 @@ from src.dataload.application.services.error_handling import (
     with_error_handling,
     create_enhanced_error
 )
-from src.dataload.domain.entities import (
+from dataload.domain.entities import (
     DataMoveError,
     ValidationError,
     DatabaseOperationError

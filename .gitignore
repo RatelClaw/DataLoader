@@ -23,5 +23,6 @@ Thumbs.db
 
 # Environment variables
 .env
-
+.kiro
+.Kiro
 dist/
