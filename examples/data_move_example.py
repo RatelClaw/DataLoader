@@ -12,6 +12,8 @@ from dataload.infrastructure.db.postgres_data_move_repository import PostgresDat
 from dataload.infrastructure.db.db_connection import DBConnection
 from dataload.interfaces.storage_loader import StorageLoaderInterface
 from dataload.config import logger
+from dataload.application.use_cases.data_move_use_case import ValidationError
+from dataload.application.use_cases.data_move_use_case import DatabaseOperationError
 
 
 class LocalCSVLoader(StorageLoaderInterface):
@@ -39,10 +41,10 @@ async def example_new_table_creation():
     sample_data.to_csv(csv_path, index=False)
     print(f"Created sample CSV: {csv_path}")
     
-    # Initialize components (you would use real DB connection in practice)
+    # # Initialize components (you would use real DB connection in practice)
     # db_connection = DBConnection()  # Configure with your DB settings
+    # await db_connection.initialize()  # Initialize the connection pool
     # repository = PostgresDataMoveRepository(db_connection)
-    # 
     # # Use auto-detection for storage loader
     # use_case = DataMoveUseCase.create_with_auto_loader(repository=repository)
     # 
@@ -50,6 +52,7 @@ async def example_new_table_creation():
     # result = await use_case.execute(
     #     csv_path=csv_path,
     #     table_name="employees",
+    #     move_type="new_schema",
     #     primary_key_columns=["id"]
     # )
     # 
@@ -138,23 +141,31 @@ async def example_existing_schema_validation():
     # This example shows existing_schema mode (strict validation)
     csv_path = "sample_employees.csv"
     
+    # Initialize components (you would use real DB connection in practice)
+    db_connection = DBConnection()  # Configure with your DB settings
+    await db_connection.initialize()  # Initialize the connection pool
+    repository = PostgresDataMoveRepository(db_connection)
+    
+    # Use auto-detection for storage loader
+    use_case = DataMoveUseCase.create_with_auto_loader(repository=repository)
+    
     # use_case = DataMoveUseCase(repository, storage_loader)
-    # 
-    # try:
-    #     result = await use_case.execute(
-    #         csv_path=csv_path,
-    #         table_name="existing_employees_table",
-    #         move_type="existing_schema"  # Strict validation
-    #     )
-    #     print(f"Data replacement successful: {result.rows_processed} rows")
-    # 
-    # except ValidationError as e:
-    #     print(f"Validation failed: {e}")
-    #     # Handle validation errors (schema mismatch, type conflicts, etc.)
-    # 
-    # except DatabaseOperationError as e:
-    #     print(f"Database operation failed: {e}")
-    #     # Handle database errors
+    
+    try:
+        result = await use_case.execute(
+            csv_path=csv_path,
+            table_name="employees",
+            move_type="existing_schema"  # Strict validation
+        )
+        print(f"Data replacement successful: {result.rows_processed} rows")
+    
+    except ValidationError as e:
+        print(f"Validation failed: {e}")
+        # Handle validation errors (schema mismatch, type conflicts, etc.)
+    
+    except DatabaseOperationError as e:
+        print(f"Database operation failed: {e}")
+        # Handle database errors
     
     print("Note: existing_schema requires exact column and type matching")
 
@@ -288,13 +299,13 @@ async def main():
     print("DataMove Use Case Examples")
     print("=" * 50)
     
-    await example_new_table_creation()
-    await example_s3_integration()
-    await example_dry_run_validation()
+    # await example_new_table_creation()
+    # await example_s3_integration()
+    # await example_dry_run_validation()
     await example_existing_schema_validation()
-    await example_new_schema_flexibility()
-    await example_error_handling()
-    example_configuration()
+    # await example_new_schema_flexibility()
+    # await example_error_handling()
+    # example_configuration()
     
     print("\n" + "=" * 50)
     print("Examples completed!")

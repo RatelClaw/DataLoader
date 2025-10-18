@@ -159,12 +159,28 @@ async def example_1_new_table_creation(use_case: DataMoveUseCase, sample_files: 
     print("="*60)
     
     try:
-        # Execute data move for new table
-        result = await use_case.execute(
-            csv_path=sample_files['employees'],
-            table_name="dm_employees_new",
-            primary_key_columns=["id"]  # Specify primary key for new table
-        )
+        # First, try to check if table exists and handle accordingly
+        table_name = "dm_employees_new"
+        
+        # Try as new table first, if it fails because table exists, 
+        # then use existing_schema mode
+        try:
+            result = await use_case.execute(
+                csv_path=sample_files['employees'],
+                table_name=table_name,
+                primary_key_columns=["id"]  # Specify primary key for new table
+            )
+        except ValidationError as ve:
+            if "move_type parameter is required" in str(ve):
+                print("📋 Table already exists, using existing_schema mode for demonstration")
+                result = await use_case.execute(
+                    csv_path=sample_files['employees'],
+                    table_name=table_name,
+                    move_type="existing_schema",
+                    primary_key_columns=["id"]
+                )
+            else:
+                raise ve
         
         print(f"✅ Success: {result.success}")
         print(f"📊 Rows processed: {result.rows_processed}")
@@ -197,7 +213,8 @@ async def example_2_dry_run_validation(use_case: DataMoveUseCase, sample_files: 
         # Get operation preview
         preview = await use_case.get_operation_preview(
             csv_path=sample_files['employees_updated'],
-            table_name="dm_employees_new"  # Table from example 1
+            table_name="dm_employees_new",  # Table from example 1
+            move_type="new_schema"  # Required for existing table
         )
         
         print(f"✅ Validation passed: {preview.validation_passed}")
